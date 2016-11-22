@@ -4,7 +4,6 @@
 
 #r @"packages/FAKE/tools/FakeLib.dll"
 #load "paket-files/fsharp/FAKE/modules/Octokit/Octokit.fsx"
-#load "build_docs.fsx"
 open Fake
 open Fake.Git
 open Fake.AssemblyInfoFile
@@ -101,10 +100,6 @@ Target "Clean" (fun _ ->
     CleanDirs ["temp"; ]
 )
 
-Target "CleanDocs" (fun _ ->
-    CleanDirs ["docs/output"]
-)
-
 // --------------------------------------------------------------------------------------
 // Build library & test project
 
@@ -150,17 +145,6 @@ Target "RunTests" (fun _ ->
 // --------------------------------------------------------------------------------------
 // Release Scripts
 
-Target "ReleaseDocs" (fun _ ->
-    let tempDocsDir = "temp/gh-pages"
-    CleanDir tempDocsDir
-    Repository.cloneSingleBranch "" (gitHome + "/" + gitName + ".git") "gh-pages" tempDocsDir
-
-    CopyRecursive "docs/output" tempDocsDir true |> tracefn "%A"
-    StageAll tempDocsDir
-    Git.Commit.Commit tempDocsDir (sprintf "Update generated documentation for version %s" release.NugetVersion)
-    Branches.push tempDocsDir
-)
-
 Target "ZipRelease" (fun _ ->
     !! (tempDir  </> "forge.sh")
     ++ (tempDir  </> "forge.cmd")
@@ -205,20 +189,11 @@ Target "Release" (fun _ ->
     |> Async.RunSynchronously
 )
 
-Target "KeepRunning" (fun _ ->
-    use watcher = !! "docs/content/**/*.*" |> WatchChanges (fun changes ->
-         Build_docs.generateHelp false
-    )
-    System.Threading.Thread.Sleep -1
-
-    watcher.Dispose()
-)
 
 // --------------------------------------------------------------------------------------
 // Run all targets by default. Invoke 'build <Target>' to override
 
 Target "Default" DoNothing
-Target "GenerateDocs" DoNothing
 Target "PaketBuild" DoNothing
 
 
@@ -234,16 +209,8 @@ Target "PaketBuild" DoNothing
   ==> "RunTests"
   ==> "Default"
 
-"Build"
-  ==> "CleanDocs"
-  ==> "GenerateHelp"
-  ==> "GenerateReferenceDocs"
-  ==> "GenerateDocs"
-  ==> "ReleaseDocs"
-
 "BuildTests"
   ==> "ZipRelease"
-  ==> "ReleaseDocs"
   ==> "Release"
 
 "Build"
